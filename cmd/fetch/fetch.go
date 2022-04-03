@@ -3,12 +3,21 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/governet/go-fec-fetcher/pkg/downloader"
-	"github.com/spf13/cobra"
 	"log"
+	"net/http"
+
+	"github.com/governet/go-fec-fetcher/pkg/bucketUrls"
+	"github.com/governet/go-fec-fetcher/pkg/s3"
+
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/spf13/cobra"
 )
 
-const fecBulkDataUrlRoot = "https://fec.gov/files/bulk-downloads/2008/cm08.zip"
+const FecBulkDataUrlRoot = "https://fec.gov/files/bulk-downloads/2008/cm08.zip"
+const FecBulkDataS3Bucket = "cg-519a459a-0ea3-42c2-b7bc-fa1143481f74"
+const FecBulkDataS3Region = "us-gov-west-1"
+const MirrorBucket = "fec-bulk-mirror"
+const MirrorRegion = "us-east-1"
 
 type fetchDataOptions struct {
 	filename string
@@ -39,7 +48,37 @@ func init() {
 }
 
 func (fd *fetchDataOptions) fetchData(ctx context.Context) error {
-	fmt.Println("THIS IS ANNOYING")
-	downloader.DownloadFile(fecBulkDataUrlRoot, fd.filename)
+	fecS3Client, err := s3.New(FecBulkDataS3Region, credentials.AnonymousCredentials)
+	if err != nil {
+		return fmt.Errorf("setting up FEC bulk data s3 client: %v", err)
+	}
+	u := bucketUrls.New(FecBulkDataS3Bucket, FecBulkDataS3Region)
+
+	fecObjects, err := fecS3Client.ListObjects(FecBulkDataS3Bucket, nil)
+	if err != nil {
+		return fmt.Errorf("fetching FEC objects: %v", err)
+	}
+
+	mirrorCreds := credentials.NewChainCredentials([]credentials.Provider{&credentials.SharedCredentialsProvider{}})
+	mirrorS3Client, err := s3.New(MirrorRegion, mirrorCreds)
+	if err != nil {
+		return fmt.Errorf("setting up mirror bulk data s3 client: %v", err)
+	}
+
+	for _, o := range fecObjects {
+		k := u.Url(*o.Key)
+		fmt.Printf("%v\n", k)
+		response, err := http.Get(k)
+		if err != nil {
+			return fmt.Errorf("reading from url %s: %v", k, err)
+		}
+		defer response.Body.Close()
+
+		_, err = mirrorS3Client.UploadObject(MirrorBucket, *o.Key, response.Body)
+		if err != nil {
+			return fmt.Errorf("uploading to mirror bucket %s at key %s: %v", MirrorBucket, *o.Key, err)
+		}
+	}
+
 	return nil
 }
