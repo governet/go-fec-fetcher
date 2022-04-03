@@ -1,0 +1,15 @@
+Upload failed on first run:
+```
+https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/bulk-downloads/2016/2016_INDEPENDENT_EXPENDITURE_DOWNLOAD.csv
+https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/bulk-downloads/2016/2016_PAC_DOWNLOAD.csv
+Error: failed to fetch FEC bulk data: uploading to mirror bucket fec-bulk-mirror at key bulk-downloads/2016/2016_PAC_DOWNLOAD.csv: uploading object to key bulk-downloads/2016/2016_PAC_DOWNLOAD.csv in bucket fec-bulk-mirror: MultipartUpload: upload multipart failed
+	upload id: trOalewTRO8hXMkh63a_A4IuU_ETK7Vb_YitTjACx9nQo7oMjpsy34m9IkvgWnLB0KG.sghBlu5hz5WOIjbPp8mt7j0AGljd5ekAPoaT1sCHaFxSlKEvoVUJAzV1OifW
+caused by: ReadRequestBody: read multipart upload data failed
+caused by: read tcp 192.168.86.151:51185->108.175.48.32:443: read: connection reset by peer
+```
+
+Will need to
+- add retries to uploader
+- add retries to any s3 or service related API call
+- add functionality to start upload/mirror on specific key, or segment by key space
+- restart upload to mirror from 2016
